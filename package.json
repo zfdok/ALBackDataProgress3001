@@ -1,0 +1,31 @@
+{
+  "name": "ALLK_back",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "start": "node bin/www2",
+    "dev": "./node_modules/.bin/nodemon bin/www2",
+    "prd": "pm2 start bin/www2",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "dependencies": {
+    "debug": "^4.1.1",
+    "koa": "^2.7.0",
+    "koa-bodyparser": "^4.2.1",
+    "koa-convert": "^1.2.0",
+    "koa-json": "^2.0.2",
+    "koa-logger": "^3.2.0",
+    "koa-onerror": "^4.1.0",
+    "koa-router": "^7.4.0",
+    "koa-static": "^5.0.0",
+    "koa-views": "^6.2.0",
+    "mysql": "^2.18.1",
+    "node-schedule": "^2.0.0",
+    "pug": "^2.0.3",
+    "request": "^2.88.2",
+    "tencentcloud-sdk-nodejs": "^4.0.167"
+  },
+  "devDependencies": {
+    "nodemon": "^1.19.1"
+  }
+}
