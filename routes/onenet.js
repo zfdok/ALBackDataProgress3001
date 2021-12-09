@@ -3,6 +3,7 @@ var request = require('request');
 var onenet_req = require('../req/onenet_req')
 var mysqlAPI = require('../mysql/mysqlAIP');
 var sms = require("../sms/smsAPI")
+let webnotice = require("../notice/webnotice")
 
 
 router.prefix('/onenet')
@@ -30,7 +31,6 @@ router.get('/send_sms_alarm', async (ctx) => {
 //更新设备列表
 router.get('/updategroup', async (ctx, next) => {
   let devicelist = await onenet_req.getAllDevices(ctx)
-  console.log(devicelist);
   devicelist.forEach(async device => {
     await mysqlAPI.updateDeviceAndGroupInfo(device)
     await mysqlAPI.updateSmsDayCountDaily(device)
@@ -42,65 +42,105 @@ router.get('/tempua', async (ctx, next) => {
   const rev = ctx.query
   ctx.body = rev.msg
 })
+
 //规则引擎,数据流转API
 router.post('/tempua', async (ctx, next) => {
   const rev = ctx.request.body
   let info = JSON.parse(rev.msg)
-  //在线数据处理
   if (info.productId == ctx.state.projectID_zx) {
     if (!zx[info.deviceName]) zx[info.deviceName] = {}
-    if (info.data.params.temp) {
-      zx[info.deviceName].temp = info.data.params.temp.value
-      zx[info.deviceName].humi = info.data.params.humi.value
-      zx[info.deviceName].le = info.data.params.le ? info.data.params.le.value : 0
-      zx[info.deviceName].ln = info.data.params.le ? info.data.params.ln.value : 0
-      zx[info.deviceName].timestamp = info.data.params.temp.time
-      zx[info.deviceName].tempUA = info.data.params.tempUA ? info.data.params.tempUA.value : 0
-      zx[info.deviceName].tempLA = info.data.params.tempLA ? info.data.params.tempLA.value : 0
-      if (info.data.params.start_time) {
-        zx[info.deviceName].start_time = info.data.params.start_time.value;
-        zx[info.deviceName].last_time = 0;
+    if (info.data.params) {
+      if (info.data.params.temp) {
+        zx[info.deviceName].temp = info.data.params.temp.value
+        zx[info.deviceName].humi = info.data.params.humi.value
+        zx[info.deviceName].le = info.data.params.le ? info.data.params.le.value : 0
+        zx[info.deviceName].ln = info.data.params.le ? info.data.params.ln.value : 0
+        zx[info.deviceName].timestamp = info.data.params.temp.time
+        zx[info.deviceName].tempUA = info.data.params.tempUA ? info.data.params.tempUA.value : 0
+        zx[info.deviceName].tempLA = info.data.params.tempLA ? info.data.params.tempLA.value : 0
+        if (info.data.params.temp && !info.data.params.tempUA) {
+          console.log("这是补传的!!!!")
+          let res = await mysqlAPI.getDeviceLastData("zx", info.deviceName)
+          console.log(res);
+          zx[info.deviceName].le = res.le
+          zx[info.deviceName].ln = res.ln
+          console.log(zx);
+          // mysqlAPI.updateDeviceRecTimerecord(info.deviceName, zx[info.deviceName], 'zx');
+          mysqlAPI.setDeviceHistory(info.deviceName, zx[info.deviceName], 'zx');
+          console.log("完成补传!!!!")
+        }
+        if (info.data.params.start_time) {
+          zx[info.deviceName].start_time = info.data.params.start_time.value;
+          zx[info.deviceName].last_time = 0;
+        }
+        if (info.data.params.last_time)
+          zx[info.deviceName].last_time = info.data.params.last_time.value;
+
+        //开始记录时,更新上下限
+        if (info.data.params.start_time == info.data.params.last_time && info.data.params.tempUA) {
+          let res = await onenet_req.getTempDesired(ctx, info.productId, info.deviceName)
+          console.log(res);
+          let tempU = res.tempU.value
+          let tempL = res.tempL.value
+          let period = res.period.value
+          mysqlAPI.updateDeviceRecTimerecordLimit(info.deviceName, zx[info.deviceName], 'zx', tempU, tempL, period);
+        }
+        // 温度超限报警
+        if (zx[info.deviceName].tempUA > 0 || zx[info.deviceName].tempLA > 0) {
+          let sms_span = await mysqlAPI.getSmsSpanFromDevice(info.deviceName)
+          let res = await onenet_req.getTempDesired(ctx, info.productId, info.deviceName)
+          let tempU = res.tempU.value
+          let tempL = res.tempL.value
+          mysqlAPI.updateDeviceAlarmHistory(info.deviceName, zx[info.deviceName], 'zx', zx[info.deviceName].tempUA, tempU, zx[info.deviceName].tempLA, tempL);
+          let update_time = new Date(zx[info.deviceName].timestamp);
+          let update_time_str = `${update_time.getFullYear()}年${update_time.getMonth() + 1}月${update_time.getDay()}日${update_time.getHours()}:${update_time.getMinutes()}`;
+          //判断超温
+          if (zx[info.deviceName].tempUA > 0) {
+            webnotice.updateWEBDeviceAlarm(info.deviceName, zx[info.deviceName].temp, tempU, update_time, update_time_str, "upper")
+            if (zx[info.deviceName].tempUA % sms_span == 0) {
+              //"发送超温短信");
+              let phoneNum = await mysqlAPI.getPhoneNumberFromDevice(info.deviceName)
+              sms.sendSMS(phoneNum, info.deviceName, zx[info.deviceName].temp, tempU, update_time_str, 1043001)
+            }
+          }
+          //判断低温
+          if (zx[info.deviceName].tempLA > 0) {
+            webnotice.updateWEBDeviceAlarm(info.deviceName, zx[info.deviceName].temp, tempL, update_time_str, "lower")
+            if (zx[info.deviceName].tempLA % sms_span == 0) {
+              //"发送低温短信");
+              let phoneNum = await mysqlAPI.getPhoneNumberFromDevice(info.deviceName)
+              sms.sendSMS(phoneNum, info.deviceName, zx[info.deviceName].temp, tempL, update_time_str, 1042997)
+            }
+          }
+        }
       }
-      if (info.data.params.last_time)
-        zx[info.deviceName].last_time = info.data.params.last_time.value;
-      // 这里可以提交数据库");
-      mysqlAPI.updateDeviceRecTimerecord(info.deviceName, zx[info.deviceName], 'zx');
-      mysqlAPI.setDeviceHistory(info.deviceName, zx[info.deviceName], 'zx');
     }
-    //判断超温
-    if (zx[info.deviceName].tempUA > 0) {
-      let sms_span = await mysqlAPI.getSmsSpanFromDevice(info.deviceName)
-      let res = await onenet_req.getTempDesired(ctx, info.productId, info.deviceName)
-      let tempU = res.tempU.value
-      let tempL = res.tempL.value
-      console.log("????", tempU, tempL);
-      mysqlAPI.updateDeviceAlarmHistory(info.deviceName, zx[info.deviceName], 'zx', zx[info.deviceName].tempUA, tempU, zx[info.deviceName].tempLA, tempL);
-      if (zx[info.deviceName].tempUA % sms_span == 0) {
-        //"发送超温短信");
-        let phoneNum = await mysqlAPI.getPhoneNumberFromDevice(info.deviceName)
-        let update_time = new Date(zx[info.deviceName].timestamp);
-        let update_time_str = `${update_time.getFullYear()}年${update_time.getMonth()}月${update_time.getDay()}日${update_time.getHours()}:${update_time.getMinutes()}`;
-        let tempU = res.tempU.value
-        sms.sendSMS(phoneNum, info.deviceName, zx[info.deviceName].temp, tempU, update_time_str, 1043001)
-      }
-    }
-    //判断低温
-    if (zx[info.deviceName].tempLA > 0) {
-      let sms_span = await mysqlAPI.getSmsSpanFromDevice(info.deviceName)
-      let tempU = res.tempU.value
-      let tempL = res.tempL.value
-      mysqlAPI.updateDeviceAlarmHistory(info.deviceName, zx[info.deviceName], 'zx', zx[info.deviceName].tempUA, tempU, zx[info.deviceName].tempLA, tempL);
-      if (zx[info.deviceName].tempLA % sms_span == 0) {
-        //"发送低温短信");
-        let phoneNum = await mysqlAPI.getPhoneNumberFromDevice(info.deviceName)
-        let update_time = new Date(zx[info.deviceName].timestamp);
-        let update_time_str = `${update_time.getFullYear()}年${update_time.getMonth()}月${update_time.getDay()}日${update_time.getHours()}:${update_time.getMinutes()}`;
-        let res = await onenet_req.getTempDesired(ctx, info.productId, info.deviceName)
-        let tempL = res.tempL.value
-        sms.sendSMS(phoneNum, info.deviceName, zx[info.deviceName].temp, tempL, update_time_str, 1042997)
+    if (info.data.lon) {
+      console.log("info");
+      console.log(info);
+      // if (zx[info.deviceName].timestamp == info.timestamp) {
+        zx[info.deviceName].le = info.data.lon
+        zx[info.deviceName].ln = info.data.lat
+        zx[info.deviceName].timestamp = info.timestamp
+        console.log(zx[info.deviceName].le);
+        console.log(zx[info.deviceName].ln);
+      // } else {
+      //   console.log("??????????");
+      //   console.log("zx[info.deviceName].timestamp", zx[info.deviceName].timestamp);
+      //   console.log("info.timestamp", info.timestamp);
+      // }
+      if (zx[info.deviceName].temp) {
+        console.log(zx);
+        mysqlAPI.updateDeviceRecTimerecord(info.deviceName, zx[info.deviceName], 'zx');
+        mysqlAPI.setDeviceHistory(info.deviceName, zx[info.deviceName], 'zx');
+      }else{
+        console.log("??????????");
+        console.log(zx);
+        console.log("??????????");
       }
     }
   }
+
   //冷库数据处理
   if (info.productId == ctx.state.projectID_zhlk) {
     if (!zhlk[info.deviceName]) zhlk[info.deviceName] = {}
@@ -121,39 +161,36 @@ router.post('/tempua', async (ctx, next) => {
       mysqlAPI.updateDeviceRecTimerecord(info.deviceName, zhlk[info.deviceName], 'zhlk');
       mysqlAPI.setDeviceHistory(info.deviceName, zhlk[info.deviceName], 'zhlk');
     }
-    //判断超温
-    if (zhlk[info.deviceName].tempUA > 0) {
+    if (zhlk[info.deviceName].tempUA > 0 || zhlk[info.deviceName].tempLA > 0) {
       let sms_span = await mysqlAPI.getSmsSpanFromDevice(info.deviceName)
       let res = await onenet_req.getTempDesired(ctx, info.productId, info.deviceName)
       let tempU = res.tempU.value
       let tempL = res.tempL.value
       console.log("sms_span:", sms_span);
+      let update_time = new Date(zhlk[info.deviceName].timestamp);
+      let update_time_str = `${update_time.getFullYear()}年${update_time.getMonth() + 1}月${update_time.getDay()}日${update_time.getHours()}:${update_time.getMinutes()}`;
       mysqlAPI.updateDeviceAlarmHistory(info.deviceName, zhlk[info.deviceName], 'zhlk', zhlk[info.deviceName].tempUA, tempU, zhlk[info.deviceName].tempLA, tempL);
-      if (zhlk[info.deviceName].tempUA % sms_span == 0) {
-        //"发送超温短信");
-        let phoneNum = await mysqlAPI.getPhoneNumberFromDevice(info.deviceName)
-        let update_time = new Date(zhlk[info.deviceName].timestamp);
-        let update_time_str = `${update_time.getFullYear()}年${update_time.getMonth()}月${update_time.getDay()}日${update_time.getHours()}:${update_time.getMinutes()}`;
-        sms.sendSMS(phoneNum, info.deviceName, zhlk[info.deviceName].temp, tempU, update_time_str, 1043001)
+      //判断超温
+      if (zhlk[info.deviceName].tempUA > 0) {
+        webnotice.updateWEBDeviceAlarm(info.deviceName, zhlk[info.deviceName].temp, tempU, update_time, update_time_str, "upper")
+        if (zhlk[info.deviceName].tempUA % sms_span == 0) {
+          //"发送超温短信");
+          let phoneNum = await mysqlAPI.getPhoneNumberFromDevice(info.deviceName)
+          sms.sendSMS(phoneNum, info.deviceName, zhlk[info.deviceName].temp, tempU, update_time_str, 1043001)
+        }
       }
-    }
-    //判断低温
-    if (zhlk[info.deviceName].tempLA > 0) {
-      let sms_span = await mysqlAPI.getSmsSpanFromDevice(info.deviceName)
-      let res = await onenet_req.getTempDesired(ctx, info.productId, info.deviceName)
-      let tempU = res.tempU.value
-      let tempL = res.tempL.value
-      mysqlAPI.updateDeviceAlarmHistory(info.deviceName, zhlk[info.deviceName], 'zhlk', zhlk[info.deviceName].tempUA, tempU, zhlk[info.deviceName].tempLA, tempL);
-      if (zhlk[info.deviceName].tempLA % sms_span == 0) {
-        //"发送低温短信"
-        let phoneNum = await mysqlAPI.getPhoneNumberFromDevice(info.deviceName)
-        let update_time = new Date(zhlk[info.deviceName].timestamp);
-        let update_time_str = `${update_time.getFullYear()}年${update_time.getMonth()}月${update_time.getDay()}日${update_time.getHours()}:${update_time.getMinutes()}`;
-        sms.sendSMS(phoneNum, info.deviceName, zhlk[info.deviceName].temp, tempL, update_time_str, 1042997)
+      //判断低温
+      if (zhlk[info.deviceName].tempLA > 0) {
+        webnotice.updateWEBDeviceAlarm(info.deviceName, zhlk[info.deviceName].temp, tempL, update_time_str, "lower")
+        if (zhlk[info.deviceName].tempLA % sms_span == 0) {
+          //"发送低温短信"
+          let phoneNum = await mysqlAPI.getPhoneNumberFromDevice(info.deviceName)
+          sms.sendSMS(phoneNum, info.deviceName, zhlk[info.deviceName].temp, tempL, update_time_str, 1042997)
+        }
       }
     }
   }
-  //
   ctx.body = rev.msg
 })
+
 module.exports = router

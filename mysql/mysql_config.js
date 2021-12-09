@@ -4,7 +4,7 @@ const mysqlConfig = {
   database: "alyun",
   host: "140.143.229.183",
   port: 3306,
-  timezone: '08:00'
+  timezone: '08:00',
 };
 
 module.exports = mysqlConfig;

@@ -31,32 +31,33 @@ var DROP_COLUM = (tableName, column_name) =>
 /************************数据操作相关************************
  * 数据操作相关 DML
  *************************************************************/
-//(1) 查询表中所有数据
-var QUERY_DATAS = (tableName) => `SELECT * FROM ${tableName}`;
 //(2) 插入数据(全部列)
 var INSERT_DATAS = (tableName, values) =>
-  `INSERT INTO ${tableName} VALUES (${values});`;
+`INSERT INTO ${tableName} VALUES (${values});`;
 //(3) 插入数据(部分列)
 var INSERT_DATA = (tableName, colums, values) =>
-  `INSERT INTO ${tableName}(${colums}) VALUES (${values});`;
+`INSERT INTO ${tableName}(${colums}) VALUES (${values});`;
 //(4) 删除数据(根据id)
 var DELETE_DATA_BY_ID = (tableName, id) =>
-  `DELETE FROM ${tableName} WHERE (id = ${id});`;
+`DELETE FROM ${tableName} WHERE (id = ${id});`;
 //(5) 删除所有数据
 var DELETE_DATAS = (tableName) => `DELETE FROM ${tableName};`;
 //(6) 更新数据条目
 var UPDATE_DATA = (tableName, colum, value, where, keyword) =>
-  `UPDATE ${tableName} SET ${colum} = ${value} WHERE ${where} = ${keyword};`;
+`UPDATE ${tableName} SET ${colum} = ${value} WHERE ${where} = ${keyword};`;
 //(7) 没有有就插入,有就更新
 var INSERT_OR_UPDATA_DATAS = (tableName, colums, values) =>
-  `REPLACE INTO ${tableName}(${colums}) VALUES (${values}) ;`;
+`REPLACE INTO ${tableName}(${colums}) VALUES (${values}) ;`;
 //(8) 更新多个条目数据
 var UPDATE_DATAS = (tableName, colum_value, where, keyword) =>
-  `UPDATE ${tableName} SET ${colum_value} WHERE ${where} = ${keyword};`;
+`UPDATE ${tableName} SET ${colum_value} WHERE ${where} = ${keyword};`;
 
 /************************查询操作相关************************
  * 数据查询相关 DQL
  *************************************************************/
+//(1) 查询表中所有数据
+var QUERY_DATAS = (tableName) => `SELECT * FROM ${tableName}`;
+var QUERY_A_DATA = (tableName,selectword) => `SELECT ${selectword} FROM ${tableName}`;
 //(1) 通过where查询
 var QUERY_DATAS_BY_WHERE = (tableName, where, keyword) => `SELECT * FROM ${tableName} WHERE ${where} = '${keyword}';`;
 //(2) 通过where查询
@@ -90,7 +91,6 @@ module.exports = {
   ADD_COLUM,
   DROP_COLUM,
   //数据操作相关 DML
-  QUERY_DATAS,
   INSERT_DATAS,
   INSERT_DATA,
   DELETE_DATA_BY_ID,
@@ -99,6 +99,8 @@ module.exports = {
   UPDATE_DATAS,
   INSERT_OR_UPDATA_DATAS,
   //数据查询相关 DQL
+  QUERY_DATAS,
+  QUERY_A_DATA,
   QUERY_DATAS_BY_WHERE,
   QUERY_A_DATA_BY_WHERE,
   QUERY_A_DATA_BY_WHERES,

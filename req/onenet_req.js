@@ -102,6 +102,7 @@ var getTempDesired = async (ctx,product_id,device_name) => {
         "params": [
           "tempL",
           "tempU",
+          "period",
         ]
       }
     }, function (error, response, body) {
