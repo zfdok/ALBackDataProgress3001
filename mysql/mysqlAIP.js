@@ -1,9 +1,24 @@
 const { query } = require("../mysql/query"); //引入异步查询方法
 const { QUERY_A_DATA, QUERY_A_DATA_BY_WHERE, UPDATE_DATA, UPDATE_DATAS,
-  INSERT_DATA, QUERY_DATAS_BY_WHERE,
+  INSERT_DATA,INSERT_DATAS, QUERY_DATAS_BY_WHERE,
   QUERY_DATAS_BY_WHERE_ORDER_BY_WHAT_DESC,
   QUERY_A_DATA_BY_WHERES
 } = require("../mysql/sql"); //部分引入sql库
+//------------------------验证码相关-------------------------------//
+// 写入验证码
+let update_sms_code = async (username,code) =>{
+  console.log(username);
+  console.log(code);
+  let query_res = await query(UPDATE_DATAS("alyun.users", `sms_code = '${code}'`, "username", `'${username}'`));//异步方法调用
+  return query_res
+}
+// 读取验证码
+let sql_sms_code = async (username) =>{
+  console.log(username);
+  let query_res = await query(QUERY_A_DATA_BY_WHERE("alyun.users", "username", `${username}`, `sms_code`));//异步方法调用
+  return query_res[0].sms_code
+}
+//------------------------更新数据相关-------------------------------//
 // 从DeviceName获取用户ID
 let getUserNameFromDevice = async (deviceName) => {
   let group_id = await query(QUERY_A_DATA_BY_WHERE("alyun.devices", "device_name", deviceName, "user_group_id"));//异步方法调用
@@ -14,15 +29,15 @@ let getUserNameFromDevice = async (deviceName) => {
 let getAllUserName = async () => {
   return await query(QUERY_A_DATA("alyun.users", `username`));
 }
-
 //更新devices数据表的前几项要素
 let updateDeviceAndGroupInfo = async (deviceInfo) => {
   let query_device_exist = await query(QUERY_A_DATA_BY_WHERE("alyun.devices", "device_name", deviceInfo.device_name, "user_group_id"));
   let query_res
   if (query_device_exist[0]) {
+    console.log(deviceInfo);
     query_res = await query(UPDATE_DATAS("alyun.devices", `user_group_id = '${deviceInfo.group_id}',product_id='${deviceInfo.product_id}'`, "device_name", `'${deviceInfo.device_name}'`));//异步方法调用
   } else {
-    query_res = await query(INSERT_DATAS("alyun.devices", `'${'deviceInfo.device_name'}','${deviceInfo.group_id}','${deviceInfo.product_id}',NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL`))
+    query_res = await query(INSERT_DATAS("alyun.devices", `'${deviceInfo.device_name}','${deviceInfo.group_id}','${deviceInfo.product_id}',NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL`))
   }
   return query_res;
 }
@@ -124,7 +139,7 @@ let updateDeviceAlarmHistory = async (device_name, device_info, device_type, tem
 //更新设备记录时间段
 let updateDeviceRecTimerecord = async (device_name, device_info, device_type) => {
   if (device_type == "zx") {
-    let time1 = new Date(device_info.start_time * 1000)
+    let time1 = new Date(device_info.start_time * 1000-2000)
     let timestr = String(time1.getFullYear()).padStart(4, '0') +
       String(time1.getMonth() + 1).padStart(2, '0') +
       String(time1.getDate()).padStart(2, '0') +
@@ -140,7 +155,7 @@ let updateDeviceRecTimerecord = async (device_name, device_info, device_type) =>
         "device_name,start_time,last_time",
         `'${device_name}',${timestr},${timestr}`))
     } else {
-      let time_last = new Date(device_info.last_time * 1000)
+      let time_last = new Date(device_info.last_time * 1000+2000)
       let time_last_str = String(time_last.getFullYear()).padStart(4, '0') +
         String(time_last.getMonth() + 1).padStart(2, '0') +
         String(time_last.getDate()).padStart(2, '0') +
@@ -257,6 +272,8 @@ let test = async () => {
   console.log(query_res[0].sms_day_limit);
 }
 module.exports = {
+  update_sms_code,
+  sql_sms_code,
   updateDeviceAndGroupInfo,
   getUserNameFromDevice,
   getAllUserName,

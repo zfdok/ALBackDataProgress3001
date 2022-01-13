@@ -81,4 +81,40 @@ let sendSMS = async (phoneNum, device, temp, limit, time, templateId) => {
   }
 }
 
-module.exports = { sendSMS }
+//发送验证码短信
+let sendSMSCode = async (phoneNum, code, templateId) => {
+  let result = { success: 400 }
+  console.log("success");
+  const params = {
+    /* 短信应用ID: 短信SmsSdkAppId在 [短信控制台] 添加应用后生成的实际SmsSdkAppId，示例如1400006666 */
+    SmsSdkAppId: "1400547237",
+    /* 短信签名内容: 使用 UTF-8 编码，必须填写已审核通过的签名，签名信息可登录 [短信控制台] 查看 */
+    SignName: "山东安冷新材料",
+    /* 短信码号扩展号: 默认未开通，如需开通请联系 [sms helper] */
+    ExtendCode: "",
+    /* 国际/港澳台短信 senderid: 国内短信填空，默认未开通，如需开通请联系 [sms helper] */
+    SenderId: "",
+    /* 用户的 session 内容: 可以携带用户侧 ID 等上下文信息，server 会原样返回 */
+    SessionContext: "",
+    /* 下发手机号码，采用 e.164 标准，+[国家或地区码][手机号]
+     * 示例如：+8613711112222， 其中前面有一个+号 ，86为国家码，13711112222为手机号，最多不要超过200个手机号*/
+    PhoneNumberSet: [phoneNum],
+    /* 模板 ID: 必须填写已审核通过的模板 ID。模板ID可登录 [短信控制台] 查看 */
+    TemplateId: templateId,
+    /* 模板参数: 若无模板参数，则设置为空*/
+    TemplateParamSet: [code],
+  }
+  client.SendSms(params, function (err, response) {
+    // 请求异常返回，打印异常信息
+    if (err) {
+      console.log(err)
+      result.success = 400
+    }
+    else {
+      console.log(response)
+      result.success = 200
+    }
+  })
+}
+
+module.exports = { sendSMS, sendSMSCode }

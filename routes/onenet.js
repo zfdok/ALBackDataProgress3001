@@ -65,7 +65,6 @@ router.post('/tempua', async (ctx, next) => {
           zx[info.deviceName].le = res.le
           zx[info.deviceName].ln = res.ln
           console.log(zx);
-          // mysqlAPI.updateDeviceRecTimerecord(info.deviceName, zx[info.deviceName], 'zx');
           mysqlAPI.setDeviceHistory(info.deviceName, zx[info.deviceName], 'zx');
           console.log("完成补传!!!!")
         }
