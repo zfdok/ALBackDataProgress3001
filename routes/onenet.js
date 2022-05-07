@@ -32,8 +32,10 @@ router.get('/send_sms_alarm', async (ctx) => {
 router.get('/updategroup', async (ctx, next) => {
   let devicelist = await onenet_req.getAllDevices(ctx)
   devicelist.forEach(async device => {
+    console.log("==============================================================");
     await mysqlAPI.updateDeviceAndGroupInfo(device)
     await mysqlAPI.updateSmsDayCountDaily(device)
+    await mysqlAPI.updateDeviceDayCountDaily(device.device_name)
   });
   ctx.body = devicelist
 })

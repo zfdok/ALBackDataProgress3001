@@ -77,10 +77,11 @@ var getAllDevices = async (ctx) => {
     if (templist.length == 0) break
     offset += 100
   }
+  console.log(allDevices)
   return allDevices
 }
 //获取设备期望值
-var getTempDesired = async (ctx,product_id,device_name) => {
+var getTempDesired = async (ctx, product_id, device_name) => {
   let rsp = await new Promise((resolve, reject) => {
     request({
       method: 'POST',
@@ -111,4 +112,4 @@ var getTempDesired = async (ctx,product_id,device_name) => {
   });//return
   return rsp
 }
-module.exports = { getGroupIDs, getAllGroupIDs, getDevices, getAllDevices ,getTempDesired}
+module.exports = { getGroupIDs, getAllGroupIDs, getDevices, getAllDevices, getTempDesired }

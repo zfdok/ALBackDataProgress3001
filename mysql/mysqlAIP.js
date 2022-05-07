@@ -1,50 +1,94 @@
 const { query } = require("../mysql/query"); //引入异步查询方法
 const { QUERY_A_DATA, QUERY_A_DATA_BY_WHERE, UPDATE_DATA, UPDATE_DATAS,
-  INSERT_DATA,INSERT_DATAS, QUERY_DATAS_BY_WHERE,
+  INSERT_DATA, INSERT_DATAS, QUERY_DATAS_BY_WHERE,
   QUERY_DATAS_BY_WHERE_ORDER_BY_WHAT_DESC,
   QUERY_A_DATA_BY_WHERES
 } = require("../mysql/sql"); //部分引入sql库
-//------------------------验证码相关-------------------------------//
-// 写入验证码
-let update_sms_code = async (username,code) =>{
-  console.log(username);
-  console.log(code);
-  let query_res = await query(UPDATE_DATAS("alyun.users", `sms_code = '${code}'`, "username", `'${username}'`));//异步方法调用
-  return query_res
-}
-// 读取验证码
-let sql_sms_code = async (username) =>{
-  console.log(username);
-  let query_res = await query(QUERY_A_DATA_BY_WHERE("alyun.users", "username", `${username}`, `sms_code`));//异步方法调用
-  return query_res[0].sms_code
-}
-//------------------------更新数据相关-------------------------------//
-// 从DeviceName获取用户ID
-let getUserNameFromDevice = async (deviceName) => {
-  let group_id = await query(QUERY_A_DATA_BY_WHERE("alyun.devices", "device_name", deviceName, "user_group_id"));//异步方法调用
-  let query_res = await query(QUERY_A_DATA_BY_WHERE("alyun.users", "user_group_id", group_id[0].user_group_id, "username"));//异步方法调用
-  return query_res[0].username;
-}
-// 获取所有用户ID
-let getAllUserName = async () => {
-  return await query(QUERY_A_DATA("alyun.users", `username`));
+
+//------------------------每日更新-------------------------------//
+//更新每日短信限额
+let updateSmsDayCountDaily = async (deviceInfo) => {
+  let query_limit = await query(QUERY_A_DATA_BY_WHERE("alyun.users", "user_group_id", `${deviceInfo.group_id}`, "sms_day_limit"))
+  query_res = await query(UPDATE_DATAS("alyun.users", `sms_day_count = ${query_limit[0].sms_day_limit}`, "user_group_id", `'${deviceInfo.group_id}'`));
 }
 //更新devices数据表的前几项要素
 let updateDeviceAndGroupInfo = async (deviceInfo) => {
   let query_device_exist = await query(QUERY_A_DATA_BY_WHERE("alyun.devices", "device_name", deviceInfo.device_name, "user_group_id"));
   let query_res
   if (query_device_exist[0]) {
-    console.log(deviceInfo);
     query_res = await query(UPDATE_DATAS("alyun.devices", `user_group_id = '${deviceInfo.group_id}',product_id='${deviceInfo.product_id}'`, "device_name", `'${deviceInfo.device_name}'`));//异步方法调用
   } else {
-    query_res = await query(INSERT_DATAS("alyun.devices", `'${deviceInfo.device_name}','${deviceInfo.group_id}','${deviceInfo.product_id}',NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL`))
+    query_res = await query(INSERT_DATA(
+      "alyun.devices",
+      "device_name,user_group_id,product_id",
+      `'${deviceInfo.device_name}','${deviceInfo.group_id}','${deviceInfo.product_id}'`
+    ));//异步方法调用
   }
+  console.log(query_res);
   return query_res;
 }
-//更新每日短信限额
-let updateSmsDayCountDaily = async (deviceInfo) => {
-  let query_limit = await query(QUERY_A_DATA_BY_WHERE("alyun.users", "user_group_id", `${deviceInfo.group_id}`, "sms_day_limit"))
-  query_res = await query(UPDATE_DATAS("alyun.users", `sms_day_count = ${query_limit[0].sms_day_limit}`, "user_group_id", `'${deviceInfo.group_id}'`));
+let updateDeviceDayCountDaily = async (device_name, day = 0) => {
+  let device_day_left = 0
+  if (day == 0) {
+    let res = await query(QUERY_A_DATA_BY_WHERE("alyun.devices", "device_name", `${device_name}`, "day_left"))
+    if (!res.length) return false
+    device_day_left = res[0].day_left
+    device_day_left--
+  }
+  else {
+    device_day_left = day
+  }
+  if (device_day_left >= 0) {
+    let query_res = await query(UPDATE_DATA(
+      "alyun.devices",
+      "day_left", device_day_left,
+      "device_name", `'${device_name}'`))
+  }
+  return true
+}
+//------------------------验证码相关-------------------------------//
+// 写入验证码
+let update_sms_code = async (username, code) => {
+  console.log(username);
+  console.log(code);
+  let query_res = await query(UPDATE_DATAS("alyun.users", `sms_code = '${code}'`, "username", `'${username}'`));//异步方法调用
+  return query_res
+}
+// 读取验证码
+let sql_sms_code = async (username) => {
+  console.log(username);
+  let query_res = await query(QUERY_A_DATA_BY_WHERE("alyun.users", "username", `${username}`, `sms_code`));//异步方法调用
+  return query_res[0].sms_code
+}
+//------------------------用户相关-------------------------------//
+// 获取所有用户ID
+let getAllUserName = async () => {
+  return await query(QUERY_A_DATA("alyun.users", `username`));
+}
+// 从DeviceName获取用户ID
+let getUserNameFromDevice = async (deviceName) => {
+  let group_id = await query(QUERY_A_DATA_BY_WHERE("alyun.devices", "device_name", deviceName, "user_group_id"));//异步方法调用
+  let query_res = await query(QUERY_A_DATA_BY_WHERE("alyun.users", "user_group_id", group_id[0].user_group_id, "username"));//异步方法调用
+  return query_res[0].username;
+}
+//------------------------短信报警相关-------------------------------//
+//查询用户设定的短信报警时间
+let getSmsSpanFromDevice = async (deviceName) => {
+  let group_id = await query(QUERY_A_DATA_BY_WHERE("alyun.devices", "device_name", deviceName, "user_group_id"));//异步方法调用
+  let query_res = await query(QUERY_A_DATA_BY_WHERE("alyun.users", "user_group_id", group_id[0].user_group_id, "sms_span"));//异步方法调用
+  return query_res[0].sms_span
+}
+//设置用户的短信额度
+let setSmsAccountFromDevice = async (deviceName, smsNo, smsDayCount) => {
+  let group_id = await query(QUERY_A_DATA_BY_WHERE("alyun.devices", "device_name", deviceName, "user_group_id"));//异步方法调用
+  let query_res = await query(UPDATE_DATAS("alyun.users", `sms_account=${smsNo},sms_day_count=${smsDayCount}`, "user_group_id", `'${group_id[0].user_group_id}'`));//异步方法调用
+  return query_res
+}
+//获取用户的短信条数余额
+let getSmsAccountFromDevice = async (deviceName) => {
+  let group_id = await query(QUERY_A_DATA_BY_WHERE("alyun.devices", "device_name", deviceName, "user_group_id"));//异步方法调用
+  let query_res = await query(QUERY_DATAS_BY_WHERE("alyun.users", "user_group_id", group_id[0].user_group_id, "sms_account"));//异步方法调用
+  return query_res[0]
 }
 //从设备名获取用户的报警电话号码
 let getPhoneNumberFromDevice = async (deviceName) => {
@@ -56,24 +100,7 @@ let getPhoneNumberFromDevice = async (deviceName) => {
   }
   return phoneNum
 }
-//获取用户的短信条数余额
-let getSmsAccountFromDevice = async (deviceName) => {
-  let group_id = await query(QUERY_A_DATA_BY_WHERE("alyun.devices", "device_name", deviceName, "user_group_id"));//异步方法调用
-  let query_res = await query(QUERY_DATAS_BY_WHERE("alyun.users", "user_group_id", group_id[0].user_group_id, "sms_account"));//异步方法调用
-  return query_res[0]
-}
-//设置用户的短信额度
-let setSmsAccountFromDevice = async (deviceName, smsNo, smsDayCount) => {
-  let group_id = await query(QUERY_A_DATA_BY_WHERE("alyun.devices", "device_name", deviceName, "user_group_id"));//异步方法调用
-  let query_res = await query(UPDATE_DATAS("alyun.users", `sms_account=${smsNo},sms_day_count=${smsDayCount}`, "user_group_id", `'${group_id[0].user_group_id}'`));//异步方法调用
-  return query_res
-}
-//查询用户设定的短信报警时间
-let getSmsSpanFromDevice = async (deviceName) => {
-  let group_id = await query(QUERY_A_DATA_BY_WHERE("alyun.devices", "device_name", deviceName, "user_group_id"));//异步方法调用
-  let query_res = await query(QUERY_A_DATA_BY_WHERE("alyun.users", "user_group_id", group_id[0].user_group_id, "sms_span"));//异步方法调用
-  return query_res[0].sms_span
-}
+//------------------------更新设备数据相关-------------------------------//
 //数据流转设备历史记录
 let setDeviceHistory = async (device_name, device_info, device_type) => {
   if (device_type == "zx") {
@@ -139,7 +166,7 @@ let updateDeviceAlarmHistory = async (device_name, device_info, device_type, tem
 //更新设备记录时间段
 let updateDeviceRecTimerecord = async (device_name, device_info, device_type) => {
   if (device_type == "zx") {
-    let time1 = new Date(device_info.start_time * 1000-2000)
+    let time1 = new Date(device_info.start_time * 1000 - 2000)
     let timestr = String(time1.getFullYear()).padStart(4, '0') +
       String(time1.getMonth() + 1).padStart(2, '0') +
       String(time1.getDate()).padStart(2, '0') +
@@ -155,7 +182,7 @@ let updateDeviceRecTimerecord = async (device_name, device_info, device_type) =>
         "device_name,start_time,last_time",
         `'${device_name}',${timestr},${timestr}`))
     } else {
-      let time_last = new Date(device_info.last_time * 1000+2000)
+      let time_last = new Date(device_info.last_time * 1000 + 2000)
       let time_last_str = String(time_last.getFullYear()).padStart(4, '0') +
         String(time_last.getMonth() + 1).padStart(2, '0') +
         String(time_last.getDate()).padStart(2, '0') +
@@ -229,7 +256,14 @@ let updateDeviceRecTimerecordLimit = async (device_name, device_info, device_typ
       "id", `${query_res[0].id}`))
   }
 }
-
+//获取设备最新的数据
+let getDeviceLastData = async (type, device_name) => {
+  if (type == "zx") {
+    let query_res = await query(QUERY_DATAS_BY_WHERE_ORDER_BY_WHAT_DESC("alyun.zx_device_history", "device_name", `${device_name}`, "timestamp", "DESC"))
+    console.log(query_res[0]);
+    return query_res[0]
+  }
+}
 //更新设备WEB报警通知
 let updateNoticeToMYSQL = async (username, type, title, desc, time, readed, first_show, icon, ad_url, ad_img) => {
   console.log(username, type, title, desc, time, readed, first_show, icon, ad_url, ad_img);
@@ -255,14 +289,7 @@ let updateNoticeToMYSQL = async (username, type, title, desc, time, readed, firs
   return query_res
 }
 
-//获取设备最新的数据
-let getDeviceLastData = async (type, device_name) => {
-  if (type == "zx") {
-    let query_res = await query(QUERY_DATAS_BY_WHERE_ORDER_BY_WHAT_DESC("alyun.zx_device_history", "device_name", `${device_name}`, "timestamp","DESC"))
-    console.log(query_res[0]);
-    return query_res[0]
-  }
-}
+
 // getDeviceLastData("zx", "al00014g0001")
 //测试专用, 无意义
 let test = async () => {
@@ -275,6 +302,7 @@ module.exports = {
   update_sms_code,
   sql_sms_code,
   updateDeviceAndGroupInfo,
+  updateDeviceDayCountDaily,
   getUserNameFromDevice,
   getAllUserName,
   getDeviceLastData,
