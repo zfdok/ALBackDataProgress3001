@@ -71,6 +71,10 @@ let getUserNameFromDevice = async (deviceName) => {
   let query_res = await query(QUERY_A_DATA_BY_WHERE("alyun.users", "user_group_id", group_id[0].user_group_id, "username"));//异步方法调用
   return query_res[0].username;
 }
+let getUserPhones = async (username) => {
+  let phones = await query(QUERY_A_DATA_BY_WHERE("alyun.users", "username", username, "alert_phones"))
+  return phones[0].alert_phones
+}
 //------------------------短信报警相关-------------------------------//
 //查询用户设定的短信报警时间
 let getSmsSpanFromDevice = async (deviceName) => {
@@ -293,11 +297,21 @@ let updateNoticeToMYSQL = async (username, type, title, desc, time, readed, firs
 // getDeviceLastData("zx", "al00014g0001")
 //测试专用, 无意义
 let test = async () => {
-  group_id = "AYqdps"
-  let query_res = await query(QUERY_A_DATA_BY_WHERE("alyun.users", "user_group_id", `${group_id}`, "sms_day_limit"))
-  // let query_res = await query(UPDATE_DATAS("alyun.users", `sms_day_count = 20`, "user_group_id", `'${group_id}'`));
-  console.log(query_res[0].sms_day_limit);
+  let user_name = await getUserNameFromDevice("al00034g0100")
+  console.log(user_name);
+  let phones = await getUserPhones(user_name)
+  console.log(phones);
+  console.log(typeof phones);
+  console.log(phones.length);
+  JSON.parse(phones).forEach(phoneNum => {
+    if (phoneNum != "") {
+      console.log(phoneNum);
+    }
+  });
 }
+
+// test()
+
 module.exports = {
   update_sms_code,
   sql_sms_code,
@@ -316,4 +330,5 @@ module.exports = {
   updateDeviceRecTimerecord,
   updateNoticeToMYSQL,
   updateDeviceRecTimerecordLimit,
+  getUserPhones,
 }

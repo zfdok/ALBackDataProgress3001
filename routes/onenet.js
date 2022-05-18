@@ -95,22 +95,34 @@ router.post('/tempua', async (ctx, next) => {
           mysqlAPI.updateDeviceAlarmHistory(info.deviceName, zx[info.deviceName], 'zx', zx[info.deviceName].tempUA, tempU, zx[info.deviceName].tempLA, tempL);
           let update_time = new Date(zx[info.deviceName].timestamp);
           let update_time_str = `${update_time.getFullYear()}年${update_time.getMonth() + 1}月${update_time.getDay()}日${update_time.getHours()}:${update_time.getMinutes()}`;
+          let user_name = await mysqlAPI.getUserNameFromDevice(info.deviceName)
+          let phones_temp = await mysqlAPI.getUserPhones(user_name)
+          let phones = []
+          JSON.parse(phones_temp).forEach(phoneNum => {
+            if (phoneNum != "") {
+              phones.push(phoneNum)
+            }
+          });
           //判断超温
           if (zx[info.deviceName].tempUA > 0) {
             webnotice.updateWEBDeviceAlarm(info.deviceName, zx[info.deviceName].temp, tempU, update_time, update_time_str, "upper")
-            if (zx[info.deviceName].tempUA % sms_span == 0) {
+            if (zx[info.deviceName].tempUA % sms_span == 1) {
               //"发送超温短信");
-              let phoneNum = await mysqlAPI.getPhoneNumberFromDevice(info.deviceName)
-              sms.sendSMS(phoneNum, info.deviceName, zx[info.deviceName].temp, tempU, update_time_str, 1043001)
+              phones.forEach(phoneNum => {
+                console.log(phoneNum);
+                sms.sendSMS(phoneNum, info.deviceName, zx[info.deviceName].temp, tempU, update_time_str, 1043001)
+              })
             }
           }
           //判断低温
           if (zx[info.deviceName].tempLA > 0) {
             webnotice.updateWEBDeviceAlarm(info.deviceName, zx[info.deviceName].temp, tempL, update_time_str, "lower")
-            if (zx[info.deviceName].tempLA % sms_span == 0) {
+            if (zx[info.deviceName].tempLA % sms_span == 1) {
               //"发送低温短信");
-              let phoneNum = await mysqlAPI.getPhoneNumberFromDevice(info.deviceName)
-              sms.sendSMS(phoneNum, info.deviceName, zx[info.deviceName].temp, tempL, update_time_str, 1042997)
+              phones.forEach(phoneNum => {
+                console.log(phoneNum);
+                sms.sendSMS(phoneNum, info.deviceName, zx[info.deviceName].temp, tempU, update_time_str, 1042997)
+              })
             }
           }
         }
@@ -119,25 +131,13 @@ router.post('/tempua', async (ctx, next) => {
     if (info.data.lon) {
       console.log("info");
       console.log(info);
-      // if (zx[info.deviceName].timestamp == info.timestamp) {
-        zx[info.deviceName].le = info.data.lon
-        zx[info.deviceName].ln = info.data.lat
-        zx[info.deviceName].timestamp = info.timestamp
-        console.log(zx[info.deviceName].le);
-        console.log(zx[info.deviceName].ln);
-      // } else {
-      //   console.log("??????????");
-      //   console.log("zx[info.deviceName].timestamp", zx[info.deviceName].timestamp);
-      //   console.log("info.timestamp", info.timestamp);
-      // }
+      zx[info.deviceName].le = info.data.lon
+      zx[info.deviceName].ln = info.data.lat
+      zx[info.deviceName].timestamp = info.timestamp
       if (zx[info.deviceName].temp) {
-        console.log(zx);
         mysqlAPI.updateDeviceRecTimerecord(info.deviceName, zx[info.deviceName], 'zx');
         mysqlAPI.setDeviceHistory(info.deviceName, zx[info.deviceName], 'zx');
-      }else{
-        console.log("??????????");
-        console.log(zx);
-        console.log("??????????");
+      } else {
       }
     }
   }
@@ -171,13 +171,23 @@ router.post('/tempua', async (ctx, next) => {
       let update_time = new Date(zhlk[info.deviceName].timestamp);
       let update_time_str = `${update_time.getFullYear()}年${update_time.getMonth() + 1}月${update_time.getDay()}日${update_time.getHours()}:${update_time.getMinutes()}`;
       mysqlAPI.updateDeviceAlarmHistory(info.deviceName, zhlk[info.deviceName], 'zhlk', zhlk[info.deviceName].tempUA, tempU, zhlk[info.deviceName].tempLA, tempL);
+      let user_name = await mysqlAPI.getUserNameFromDevice(info.deviceName)
+      let phones_temp = await mysqlAPI.getUserPhones(user_name)
+      let phones = []
+      JSON.parse(phones_temp).forEach(phoneNum => {
+        if (phoneNum != "") {
+          phones.push(phoneNum)
+        }
+      });
       //判断超温
       if (zhlk[info.deviceName].tempUA > 0) {
         webnotice.updateWEBDeviceAlarm(info.deviceName, zhlk[info.deviceName].temp, tempU, update_time, update_time_str, "upper")
         if (zhlk[info.deviceName].tempUA % sms_span == 0) {
           //"发送超温短信");
-          let phoneNum = await mysqlAPI.getPhoneNumberFromDevice(info.deviceName)
-          sms.sendSMS(phoneNum, info.deviceName, zhlk[info.deviceName].temp, tempU, update_time_str, 1043001)
+          phones.forEach(phoneNum => {
+            console.log(phoneNum);
+            sms.sendSMS(phoneNum, info.deviceName, zhlk[info.deviceName].temp, tempU, update_time_str, 1043001)
+          })
         }
       }
       //判断低温
@@ -185,8 +195,10 @@ router.post('/tempua', async (ctx, next) => {
         webnotice.updateWEBDeviceAlarm(info.deviceName, zhlk[info.deviceName].temp, tempL, update_time_str, "lower")
         if (zhlk[info.deviceName].tempLA % sms_span == 0) {
           //"发送低温短信"
-          let phoneNum = await mysqlAPI.getPhoneNumberFromDevice(info.deviceName)
-          sms.sendSMS(phoneNum, info.deviceName, zhlk[info.deviceName].temp, tempL, update_time_str, 1042997)
+          phones.forEach(phoneNum => {
+            console.log(phoneNum);
+            sms.sendSMS(phoneNum, info.deviceName, zhlk[info.deviceName].temp, tempU, update_time_str, 1042997)
+          })
         }
       }
     }
